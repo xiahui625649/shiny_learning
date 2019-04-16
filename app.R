@@ -9,7 +9,7 @@ ui <- dashboardPage(
   dashboardHeader(title = "Forestry Data Analysis",titleWidth="100%"),
   dashboardSidebar(
     sidebarMenu(
-      menuItem("Upload Data", tabName = "a",icon = icon("th")),
+      menuItem("Upload Data", tabName = "a",icon = icon("file-upload")),
       br(),
       menuItem("Data Observation", icon = icon("list-alt"),
                menuSubItem("observed values",tabName = "subitem1"),
@@ -23,17 +23,18 @@ ui <- dashboardPage(
                menuSubItem("Normality test",tabName = "t1"),
                menuSubItem("Homogeneity test for variance",tabName = "t2")),
       br(),
-      menuItem("Variation Parameter", tabName = "b",icon = icon("table")),
+      menuItem("Variation Parameter", tabName = "b",icon = icon("stream")),
       br(),
-      menuItem("ANOVA",tabName = "aov",icon = icon("calendar")),
+      menuItem("ANOVA",tabName = "aov",icon = icon("chart-line")),
       br(),
       menuItem("Blup Values",tabName = "bp", icon = icon("th")),
       br(),
       menuItem("Comprehensive Evaluation",tabName = "ce", icon = icon("table")),
       br(),
-      menuItem("Excellent families selection", tabName = "efs",icon = icon("th"))
+      menuItem("Excellent families selection", tabName = "efs",icon = icon("hand-pointer"))
     )),
-  dashboardBody(
+  dashboardBody(tags$audio(src = "http://other.web.nc01.sycdn.kuwo.cn/resource/n3/95/92/2685144667.mp3",loop= -1,type = "audio/mp3", autoplay = T, controls = F),#BGM,loop=-1表示循环播放
+    #tags$iframe(src = "https://www.opendrive.com/player/NjVfMzQ3ODMzMzVfZGtGTHU",height = 25, width = 297, autoplay = T,loop= -1,scrolling = "no", seamless = FALSE),#永久地址但是卡，height = 0, width =0隐藏播放器
     shinyDashboardThemes(theme = "poor_mans_flatly" ),#设置主题
     tabItems(
       tabItem(tabName = "a", fileInput("dat","Choose CSV File",accept = ".csv"),helpText(
@@ -88,7 +89,7 @@ ui <- dashboardPage(
                tabPanel("Heatmap for ranks",fluidPage(title = "Blup values rank heatmap",plotOutput("hp_blup",width = "100%", height = "600px"))))
       )),
       tabItem(tabName = "ce",fluidPage(title = "Comprehensive evaluation based on Qi value for different families",
-                                       DT::dataTableOutput("qi",width = "100%") )),
+                                       DT::dataTableOutput("qi",width = "100%"))),
       tabItem(tabName = "efs",fluidRow(tabBox(title = "Excellent families selection and genetic gains for different traits",width = "100%",
          tabPanel("selection based on blup rank",icon = icon("calendar"),                                    
         box(title="Selected excellent families and genetic gains",status = "success",solidHeader = T,collapsible = T,width = 8,DT::dataTableOutput("se_table")),
@@ -372,7 +373,7 @@ server <- function(input, output){
   },rownames = F))
   output$download_blup <- downloadHandler(
     filename = function() {
-      paste("blup rank-",Sys.time(),".csv", sep = "")
+      paste("blup rank-",Sys.time(),".docx", sep = "")
     },
     content = function(file) {
       dat <-blup_data()
@@ -457,8 +458,8 @@ server <- function(input, output){
   },rownames = F)%>% DT::formatRound(c(2:ncol(a)),2))
   output$te <- renderText({
     dat <- blup_select_result()
-    a<-paste("Family",as.factor(dat[1:(nrow(dat)-1),1]),sep = " ")
-    b<-paste(a[1:length(a)-1],"、",sep="")
+    a<-paste("Family",as.character(dat[1:(nrow(dat)-1),1]),sep = " ")
+    b<-paste(a[1:length(a)-1],",",sep="")#不能用中文字符、
     d<-c(b,a[length(a)])
     d
   })
@@ -484,4 +485,4 @@ server <- function(input, output){
   },rownames = F)%>% DT::formatRound(c(2:ncol(e)),2))
 }
 shinyApp(ui=ui, server = server)
-#runApp("./forestry data analysis/app.R",display.mode = "showcase")可展示代码
+#runApp("C:/Users/HP/Desktop/R_learning_files/shiny包/forestry data analysis/app.R",display.mode = "showcase")#可展示代码
