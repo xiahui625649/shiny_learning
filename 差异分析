@@ -1,0 +1,729 @@
+
+
+#
+# ### 这个函数输入数据框格式
+# #这里备注所需的数据格式
+# #前量列从第一列开始是ID，第二列是分组信息，剩下的列均为数据列
+#
+#
+# single_diff_and_plot (data_wt,plotname = "南京农业大学_",plot = "bar",method_Mc ="LSD")
+# single_diff_and_plot (data_wt,plotname = "南京农业大学_",plot = "bar",method_Mc ="scheffe")
+# single_diff_and_plot (data_wt,plotname = "资源与环境科学学院_",plot = "box",method_Mc ="LSD" )
+# single_diff_and_plot (data_wt,plotname = "资源与环境科学学院_",plot = "box",method_Mc = "scheffe" )
+# method_Mc == "Duncan"
+# single_diff_and_plot (data_wt,plotname = "资源与环境科学学院_",plot = "box",method_Mc = "Duncan" )
+
+
+#method_cv: 方差齐心方法选择,有两种方法：method_cv == "leveneTest",method_cv == "bartlett.test"
+#method_Mc:多重比较方法选择：默认Tukey。可选：LSD，
+# i = 3
+
+##更新
+
+#我将方差分析的五种多重比较方法添加到函数中，共判断选用
+#非参数检验两两检验，本来柱状图无法转化成字母标记，我将其转化为字母标记并使用。
+
+#
+# single_diff_and_plot (data_wt,plotname = "资源与环境科学学院_",plot = "box",method_Mc = "Duncan",sig_show = "abc" )
+#
+# single_diff_and_plot (data_wt,plotname = "资源与环境科学学院_",plot = "box",method_Mc = "Duncan",sig_show = "line" )
+# single_diff_and_plot (data_wt,plotname = "资源与环境科学学院_",plot = "box",method_Mc = "Duncan",sig_show = "abc" )
+#
+#
+#
+#
+# single_diff_and_plot (data_wt,plotname = "资源与环境科学学院_",plot = "bar",method_Mc = "Duncan",sig_show = "line")
+# library(easyMicrobiome)
+#
+# data("data_wt")
+# single_diff_and_plot (data_wt,plotname = "资源与环境科学学院_",plot = "bar",method_Mc = "Duncan",sig_show = "abc")
+# #
+# head(data_wt)
+#
+#
+# sig_show = "line"
+# sig_show = "abc"
+# plotname = "wentao_"
+# plot = "bar"
+# method_cv = "bartlett.test"
+# method_Mc = "Tukey"
+#
+# i = 1
+
+
+# ## 贪婪模式：
+# Greedy_model = "aov"
+#
+# Greedy_model = "non-parametric"
+
+library(tidyverse)
+library(agricolae)
+# library(car)
+library(reshape2)
+library("ggplot2")
+library("ggpubr")
+library("ggsignif")
+#
+single_diff_and_plot <- function(data_wt = data_wt,plotname = "wentao_",plot = "bar",
+                                 method_cv = "bartlett.test",method_Mc = "Tukey",sig_show = "abc")  {
+
+Mytheme <- theme_bw()+
+
+  # scale_fill_manual(values = mi, guide = guide_legend(title = NULL))+
+  theme(
+
+    panel.grid.major=element_blank(),
+    panel.grid.minor=element_blank(),
+
+    plot.title = element_text(vjust = -8.5,hjust = 0.1),
+    axis.title.y =element_text(size = 20,face = "bold",colour = "black"),
+    axis.title.x =element_text(size = 24,face = "bold",colour = "black"),
+    axis.text = element_text(size = 20,face = "bold"),
+    axis.text.x = element_text(colour = "black",size = 14),
+    axis.text.y = element_text(colour = "black",size = 14),
+    legend.text = element_text(size = 15,face = "bold"),
+    legend.position = "none"#是否删除图例
+
+  )
+  # print(i)
+
+  for (i in 3:ncol(data_wt)) {
+    #构造待分析的子数据框
+    ss <- data_wt[i]
+    colnames(ss) <- c("count")
+    ss$group = data_wt$group
+
+    #正态检验
+    xx <-  shapiro.test(as.vector(as.matrix(data_wt[i])))
+    (p1 <- xx[[2]])#得要p值
+    p1 <- round(p1,3)#保留三为小数
+
+    #方差齐性检验
+    if (method_cv == "leveneTest" ) {
+      library("car")
+      xc <- leveneTest(count~group,data=ss)
+      (p2 <- xc[[3]][1])
+
+    }
+
+
+    if (method_cv == "bartlett.test" ) {
+
+      xc <- bartlett.test(count~group,data=ss)
+      (p2 <- xc[[3]])
+      p2 <- round(p2,3)
+
+
+    }
+
+    if ( plot == "bar") {
+      name_i = colnames(data_wt[i])
+      #求取均值和方差
+      wen1 = as.data.frame(tapply(as.vector(as.matrix(data_wt[i])),data_wt$group,mean,na.rm=TRUE))
+      wen2 = as.data.frame(tapply(as.vector(as.matrix(data_wt[i])),data_wt$group,sd,na.rm=TRUE))
+      went = cbind(wen1,wen2)
+
+      colnames(went) = c("mean" ,"SD")
+      went
+      #p1 >=.05& p2 >=.05:数据符合正态分布，方差齐心
+      if (p1 >=.05& p2 >=.05) {
+        #进行方差检验 下面wtx3为提取的p值
+        model<-aov(count ~ group, data= ss)#方差分析
+        wtx1 = summary(model)
+        wtx2 = wtx1[[1]]
+        wtx3 = wtx2[5]#
+
+        #wtx3$`Pr(>F)`[1]< 0.05：当P值小于0.05时，进行多重比较
+        if ( wtx3$`Pr(>F)`[1]< 0.05) {
+
+          if (method_Mc == "Tukey") {
+            library(multcomp)
+
+            litter.mc <- glht(model, linfct = mcp(group = 'Tukey'))
+            # summary(litter.mc)
+            insx = cld(litter.mc)
+            aa <- insx$mcletters$monospacedLetters
+            aa = as.data.frame(aa)
+            colnames(aa) = c("groups")
+            head(aa)
+            aa$group = row.names(aa)
+
+          }
+
+
+          if (method_Mc == "LSD") {
+            out <- LSD.test(model,"group", p.adj="none")#进行多重比较，不矫正P值
+            aa = out$group#结果显示：标记字母法
+            aa$group = row.names(aa)
+            aa
+          }
+          #【SNK法】（Student-Newman-Keuls）程序运行结果与LSD.test类似。
+          if (method_Mc == "SNK") {
+            library("agricolae")
+            out <- SNK.test(model,"group")
+            aa = out$groups# 查看每个组的label
+
+            aa$group = row.names(aa)
+            stat = aa
+            aa
+          }
+
+          #【Duncan法】(新复极差法)（SSR）
+          if (method_Mc == "Duncan") {
+            # library("agricolae")
+            out <-duncan.test (model,"group")
+            aa = out$groups# 查看每个组的label
+
+            aa$group = row.names(aa)
+            stat = aa
+            aa
+          }
+
+          #Scheffe检验特点：各组样本数相等或不等均可以，但是以各组样本数不相等使用较多；
+          if (method_Mc == "scheffe") {
+            # library("agricolae")
+            out <-scheffe.test (model,"group")
+            aa = out$groups# 查看每个组的label
+
+            aa$group = row.names(aa)
+            stat = aa
+            aa
+          }
+
+
+          wentao = merge(aa,went, by="row.names",all=F)
+          wentao
+          FileName <- paste(plotname ,name_i,method_Mc,"_aov_bar", ".csv", sep = "_")
+          write.csv(wentao,FileName,quote = F)
+          library(tidyverse)
+          # colnames(wentao) = c(colnames(wentao[1:4]),"mean" ,"SD")
+          #使用的tidyverse函数，对数据框添加两列，目的为柱状图添加bar
+          aa = mutate(wentao, ymin = mean - SD, ymax =  mean + SD)
+          a = max(aa$mean)*1.5##用于设置y轴最大值
+
+          ### 出图柱状图
+          p = ggplot(aa , aes(x = group, y = mean,colour= group)) +
+            geom_bar(aes(colour= group,fill = group),stat = "identity", width = 0.4,position = "dodge") +
+
+            geom_errorbar(aes(ymin=ymin,
+                              ymax=ymax),
+                          colour="black",width=0.1,size = 1)+
+            # geom_hline(aes(yintercept=mean(as.vector(as.matrix(data_wt[i])))), colour="black", linetype=2) +
+            # geom_vline(aes(xintercept=0), colour="black", linetype="dashed") +
+            scale_y_continuous(expand = c(0,0),limits = c(0,a))+
+            labs(x=paste(name_i,"of all group", sep = "_"),
+                y="group",
+                    title = paste("Normality test",p1,"Homogeneity of variance",p2,sep = ":"))
+          p
+          head(aa)
+          if (sig_show == "line") {
+            zuhe = combn(aa$group,2)
+            xxxx <- tapply(zuhe,rep(1:ncol(zuhe),each=nrow(zuhe)),function(i)i)
+            xxxx
+            sig_lis = rep("a",dim(zuhe)[2])
+            for (i in 1:dim(zuhe)[2]) {
+              library(tidyverse)
+              library("ggsignif")
+
+              if (filter(aa, group == xxxx[[i]][1])$groups == filter(aa, group == xxxx[[i]][2])$groups) {
+                sig_lis[i] = "no_sig"
+              }
+
+              if (filter(aa, group == xxxx[[i]][1])$groups != filter(aa, group == xxxx[[i]][2])$groups) {
+                sig_lis[i] = "*"
+              }
+
+            }
+
+           p = p +
+              geom_signif(comparisons = xxxx, annotations=sig_lis,
+                          y_position = (seq(from=1, to=max(aa$mean)/4,length.out=dim(zuhe)[2]) + max(aa$mean)), tip_length = rep(0.03,dim(zuhe)[2]),color = "black")
+            p
+          }
+
+
+
+
+          if (sig_show == "abc") {
+
+
+            p = p + geom_text(aes(label = groups,y=ymax, x = group,vjust = -0.3,size = 6))
+            p
+          }
+          #as.vector(as.matrix(data_wt[i]))为进行差异分析的一组数据
+          p=p+Mytheme
+          p
+
+          if (length(unique(data_wt$group))>3){	p=p+theme(axis.text.x=element_text(angle=45,vjust=1, hjust=1))}
+          p
+          FileName <- paste(plotname ,name_i,method_Mc,"_aov_bar", ".pdf", sep = "_")
+          ggsave(FileName, p, width = 8, height = 8)
+
+          #wtx3$`Pr(>F)`[1]>= 0.05当p值大于0.05那么就不能做多重比较了
+        }else if ( wtx3$`Pr(>F)`[1]>= 0.05)  {
+
+          colnames(went) = c("mean" ,"SD")
+          aa = mutate(went, ymin = mean - SD, ymax =  mean + SD)
+          aa$group = levels(ss$group)
+          aa
+          a = max(aa$mean)*2
+          FileName <- paste(plotname ,name_i,method_Mc,"_aov_bar", ".csv", sep = "_")
+          write.csv(aa,FileName,quote = F)
+          p = ggplot(aa , aes(x = group, y = mean,colour= group)) +
+            geom_bar(aes(colour= group,fill = group),stat = "identity", width = 0.4,position = "dodge") +
+            # geom_text(aes(label = groups,y=ymax, x = group,vjust = -0.3,size = 6))+
+            geom_errorbar(aes(ymin=ymin,
+                              ymax=ymax),
+                          colour="black",width=0.1,size = 1)+
+            scale_y_continuous(expand = c(0,0),limits = c(0,a))+
+            labs(x=paste(name_i,"of all group", sep = "_"),
+                 y="group",
+                 title = paste("Normality test",p1,"Homogeneity of variance",p2,"aov",round(wtx3$`Pr(>F)`[1],3),sep = ":"))
+          p
+          p=p+Mytheme
+          p
+          if (length(unique(data_wt$group))>3){	p=p+theme(axis.text.x=element_text(angle=45,vjust=1, hjust=1))}
+          FileName <- paste(plotname ,name_i,"aov_nosig"," bar", ".pdf", sep = "_")
+          ggsave(FileName, p, width = 8, height = 8)
+        }
+
+
+        #   p1 <.05| p2 <.05：不符合正态检验或者方差不齐性
+      }else if (p1 <.05| p2 <.05 ){
+        library(ggpubr)
+        library("multcompView")
+        i
+        krusk=compare_means(count ~ group, data=ss, method = "kruskal.test")
+        krusk
+        sumkrusk=as.data.frame(krusk)
+        sumkrusk
+        #多组比较小于0.05，表明多组之间具有差异，可以进行两两非参数检验，并标记字母
+        #但是这里没有做，个人认为挺难的，还
+        if ( sumkrusk[3]< 0.05) {
+
+          krusk=compare_means(count ~ group, data=ss, method = "wilcox.test")
+
+          xx=as.data.frame(krusk)
+          xx$group1
+          wilcox_levels = paste(xx$group1,xx$group2,sep = "-")
+          wilcox_levels = xx$p
+
+
+          names(wilcox_levels) =  paste(xx$group1,xx$group2,sep = "-")
+
+          wilcox.labels <- data.frame(multcompLetters(wilcox_levels, threshold = 0.05)['Letters'])
+          colnames(wilcox.labels) = "groups"
+          aa = wilcox.labels
+          wentao = merge(aa,went, by="row.names",all=F)
+          wentao
+
+          # colnames(went) = c("mean" ,"SD")
+          aa = mutate(wentao, ymin = mean - SD, ymax =  mean + SD)
+          aa$group = levels(ss$group)
+          aa
+          FileName <- paste(plotname ,name_i,"_wilcox.test_YES_bar", ".csv", sep = "_")
+          write.csv(aa,FileName,quote = F)
+          a = max(aa$mean)*1.5
+
+          ### 出图柱状图
+          p = ggplot(aa , aes(x = group, y = mean,colour= group)) +
+            geom_bar(aes(colour= group,fill = group),stat = "identity", width = 0.4,position = "dodge") +
+
+            geom_errorbar(aes(ymin=ymin,
+                              ymax=ymax),
+                          colour="black",width=0.1,size = 1)+
+            # geom_hline(aes(yintercept=mean(as.vector(as.matrix(data_wt[i])))), colour="black", linetype=2) +
+            # geom_vline(aes(xintercept=0), colour="black", linetype="dashed") +
+            scale_y_continuous(expand = c(0,0),limits = c(0,a))+
+            labs(x=paste(name_i,"of all group", sep = "_"),
+                 y="group",
+                 title = paste("Normality test",p1,"Homogeneity of variance",p2,sep = ":"))
+          p
+          head(aa)
+          if (sig_show == "abc") {
+            p = p +
+              geom_text(aes(label = groups,y=ymax, x = group,vjust = -0.3,size = 6))
+            p
+          }
+
+          if (sig_show == "line") {
+            zuhe = combn(aa$group,2)
+            xxxx <- tapply(zuhe,rep(1:ncol(zuhe),each=nrow(zuhe)),function(i)i)
+            xxxx
+            sig_lis = rep("a",dim(zuhe)[2])
+            for (i in 1:dim(zuhe)[2]) {
+              library(tidyverse)
+
+              if (filter(aa, group == xxxx[[i]][1])$groups == filter(aa, group == xxxx[[i]][2])$groups) {
+                sig_lis[i] = "no_sig"
+              }
+
+              if (filter(aa, group == xxxx[[i]][1])$groups != filter(aa, group == xxxx[[i]][2])$groups) {
+                sig_lis[i] = "*"
+              }
+
+            }
+
+            p = p +
+              geom_signif(comparisons = xxxx, annotations=sig_lis,
+                          y_position = (seq(from=1, to=max(aa$mean)/4,length.out=dim(zuhe)[2]) + max(aa$mean)), tip_length = rep(0.03,dim(zuhe)[2]),color = "black")
+            p
+          }
+
+
+
+          #as.vector(as.matrix(data_wt[i]))为进行差异分析的一组数据
+          p=p+Mytheme
+          p
+          if (length(unique(data_wt$group))>3){	p=p+theme(axis.text.x=element_text(angle=45,vjust=1, hjust=1))}
+          FileName <- paste(plotname ,name_i,"_kruskal.test_YES_bar", ".pdf", sep = "_")
+          ggsave(FileName, p, width = 8, height = 8)
+          # 如果多组比较大于0.05表明多组之间不具有差异，那么直接出图
+        }else if ( sumkrusk[3] >= 0.05)  {
+          colnames(went) = c("mean" ,"SD")
+          aa = mutate(went, ymin = mean - SD, ymax =  mean + SD)
+          aa$group = levels(ss$group)
+          aa
+          a = max(aa$mean)*1.5
+          FileName <- paste(plotname ,name_i,"_kruskal.test_nosig_bar", ".csv", sep = "_")
+          write.csv(aa,FileName,quote = F)
+          p = ggplot(aa , aes(x = group, y = mean,colour= group)) +
+            geom_bar(aes(colour= group,fill = group),stat = "identity", width = 0.4,position = "dodge") +
+            geom_errorbar(aes(ymin=ymin,
+                              ymax=ymax),
+                          colour="black",width=0.1,size = 1)+
+            scale_y_continuous(expand = c(0,0),limits = c(0,a))+
+            geom_hline(aes(yintercept=mean(mean)), colour="black", linetype=2) +
+            geom_vline(aes(xintercept=0), colour="black", linetype="dashed") +
+            labs(x=paste(name_i,"of all group", sep = "_"),
+                 y="group",
+                 title = paste("Normality test",p1,"Homogeneity of variance",p2,"kruskal.test",sumkrusk[3],sep = ":"))
+          p
+          p=p + Mytheme
+          p
+          if (length(unique(data_wt$group))>3){	p=p+theme(axis.text.x=element_text(angle=45,vjust=1, hjust=1))}
+          FileName <- paste(plotname ,name_i,"_kruskal.test_nosig_bar", ".pdf", sep = "")
+          ggsave(FileName, p, width = 8, height = 8)
+        }
+
+
+      }
+
+
+
+    }
+    if( plot == "box") {
+      name_i = colnames(data_wt[i])
+
+      if (p1 >.05& p2 >.05) {
+
+        #进行方差检验 下面wtx3为提取的p值
+        model<-aov(count ~ group, data= ss)#方差分析
+        wtx1 = summary(model)
+        wtx2 = wtx1[[1]]
+        wtx3 = wtx2[5]#
+        #p1 >=.05& p2 >=.05:数据符合正态分布，方差齐心
+        if ( wtx3$`Pr(>F)`[1]< 0.05) {
+
+          # data_box = data_wt[c(1,2,i)]
+          # colnames(data_box) = c("ID" , "group","dd" )
+          # out = LSD.test(model,"group", p.adj="none") # alternative fdr
+          # stat = out$groups
+          # stat
+
+          if (method_Mc == "Tukey") {
+            library(multcomp)
+
+            litter.mc <- glht(model, linfct = mcp(group = 'Tukey'))
+            # summary(litter.mc)
+            insx = cld(litter.mc)
+            aa <- insx$mcletters$monospacedLetters
+            aa = as.data.frame(aa)
+            colnames(aa) = c("groups")
+            head(aa)
+            aa$group = row.names(aa)
+            stat = aa
+          }
+
+
+          if (method_Mc == "LSD") {
+            out <- LSD.test(model,"group", p.adj="none")#进行多重比较，不矫正P值
+            aa = out$group#结果显示：标记字母法
+            aa$group = row.names(aa)
+            aa
+            stat = aa
+          }
+
+          #【SNK法】（Student-Newman-Keuls）程序运行结果与LSD.test类似。
+          if (method_Mc == "SNK") {
+            library("agricolae")
+            out <- SNK.test(model,"group")
+            aa = out$groups# 查看每个组的label
+
+            aa$group = row.names(aa)
+            stat = aa
+            aa
+          }
+
+          #【Duncan法】(新复极差法)（SSR）
+          if (method_Mc == "Duncan") {
+            # library("agricolae")
+            out <-duncan.test (model,"group")
+            aa = out$groups# 查看每个组的label
+
+            aa$group = row.names(aa)
+            stat = aa
+            aa
+          }
+
+          #Scheffe检验特点：各组样本数相等或不等均可以，但是以各组样本数不相等使用较多；
+          if (method_Mc == "scheffe") {
+            # library("agricolae")
+            out <-scheffe.test (model,"group")
+            aa = out$groups# 查看每个组的label
+
+            aa$group = row.names(aa)
+            stat = aa
+            aa
+          }
+
+
+          data_box$stat=stat[as.character(data_box$group),]$groups
+          max=max(data_box[,c("dd")])
+          min=min(data_box[,c("dd")])
+          x = data_box[,c("group","dd")]
+          library(tidyverse)
+          y = x %>% group_by(group) %>% summarise_(Max=paste('max(',"dd",')',sep=""))
+          y=as.data.frame(y)
+          y
+          rownames(y)=y$group
+          data_box$y=y[as.character(data_box$group),]$Max + (max-min)*0.05
+
+          # mi=c("#1B9E77" ,"#D95F02", "#7570B3","#E7298A")
+          FileName <- paste(plotname ,name_i,method_Mc,"aov_box", ".csv", sep = "_")
+          write.csv(data_box,FileName,quote = F)
+
+
+          p = ggplot(data_box, aes(x=group, y=data_box[["dd"]], color=group)) +
+            geom_boxplot(alpha=1, outlier.size=0, size=0.7, width=0.5, fill="transparent") +
+            labs(x=paste(name_i," group", sep = "_"),
+                 y="group",
+                 title = paste("Normality test",p1,"Homogeneity of variance",p2,sep = ":"))+
+            geom_jitter( position=position_jitter(0.17), size=1, alpha=0.7)+theme(legend.position="none")+
+            geom_hline(aes(yintercept=mean(data_box$dd)), colour="black", linetype=2) +
+            geom_vline(aes(xintercept=0), colour="black", linetype="dashed")
+          p
+          if (sig_show == "abc") {
+            p = p +
+              geom_text(data=data_box, aes(x=group, y=y, color=group, label= stat))
+
+            p
+          }
+          wtq = levels(data_wt$group)
+          lis = combn(levels(data_wt$group), 2)
+          x <-lis
+          my_comparisons <- tapply(x,rep(1:ncol(x),each=nrow(x)),function(i)i)
+
+          # if (sig_show == "line") {
+          #
+          #
+          #
+          #   p = p +
+          #     stat_compare_means()+
+          #     stat_compare_means(comparisons=my_comparisons,label = "p.signif",hide.ns = F) # Add pairwise
+          #
+          #   p
+          # }
+
+          if (sig_show == "line") {
+            zuhe = combn(aa$group,2)
+            xxxx <- tapply(zuhe,rep(1:ncol(zuhe),each=nrow(zuhe)),function(i)i)
+            xxxx
+            sig_lis = rep("a",dim(zuhe)[2])
+            for (i in 1:dim(zuhe)[2]) {
+              library(tidyverse)
+
+              if (filter(aa, group == xxxx[[i]][1])$groups == filter(aa, group == xxxx[[i]][2])$groups) {
+                sig_lis[i] = "no_sig"
+              }
+
+              if (filter(aa, group == xxxx[[i]][1])$groups != filter(aa, group == xxxx[[i]][2])$groups) {
+                sig_lis[i] = "*"
+              }
+
+            }
+
+
+
+            p = p +
+              geom_signif(comparisons = xxxx, annotations=sig_lis,
+                          y_position = (seq(from=1, to=max(data_box$dd)/4,length.out=dim(zuhe)[2]) + max(data_box$dd)), tip_length = rep(0.03,dim(zuhe)[2]),color = "black")
+            p
+          }
+
+          p=p+Mytheme
+          p
+          if (length(unique(data_wt$group))>3){	p=p+theme(axis.text.x=element_text(angle=45,vjust=1, hjust=1))}
+          FileName <- paste(plotname ,name_i,method_Mc,"aov_box", ".pdf", sep = "_")
+          ggsave(FileName, p, width = 8, height = 8)
+
+          #wtx3$`Pr(>F)`[1]>= 0.05当p值大于0.05那么就不能做多重比较了
+        }else if ( wtx3$`Pr(>F)`[1]>= 0.05)  {
+
+          data_box = data_wt[c(1,2,i)]
+          colnames(data_box) = c("ID" , "group","dd" )
+          max=max(data_box[,c("dd")])
+          min=min(data_box[,c("dd")])
+          x = data_box[,c("group","dd")]
+          y = x %>% group_by(group) %>% summarise_(Max=paste('max(',"dd",')',sep=""))
+          y=as.data.frame(y)
+          rownames(y)=y$group
+          data_box$y=y[as.character(data_box$group),]$Max + (max-min)*0.05
+          FileName <- paste(plotname ,name_i,method_Mc,"_aov_nosig_box", ".csv", sep = "_")
+          write.csv(data_box,FileName,quote = F)
+          p = ggplot(data_box, aes(x=group, y=data_box[["dd"]], color=group)) +
+            geom_boxplot(alpha=1, outlier.size=0, size=0.7, width=0.5, fill="transparent") +
+            geom_hline(aes(yintercept=mean(as.vector(as.matrix(data_wt[i])))), colour="black", linetype=2) +
+            geom_vline(aes(xintercept=0), colour="black", linetype="dashed") +
+            labs(x=paste(name_i,"box", sep = "_"),
+                 y="group",
+                 title = paste("Normality test",p1,"Homogeneity of variance",p2,"aov",round(wtx3$`Pr(>F)`[1],3),sep = ":"))+
+            geom_jitter( position=position_jitter(0.17), size=1, alpha=0.7)+theme(legend.position="none")
+          p
+          p=p+Mytheme
+          p
+          if (length(unique(data_wt$group))>3){	p=p+theme(axis.text.x=element_text(angle=45,vjust=1, hjust=1))}
+          FileName <- paste(plotname ,name_i,"_aov_nosig_box", ".pdf", sep = "")
+          ggsave(FileName, p, width = 8, height = 8)
+        }
+        # p1 = 1
+        # p2 = 1
+
+
+        #   p1 <.05| p2 <.05：不符合正态检验或者方差不齐性
+      }else if (p1 <.05| p2 <.05){
+
+        krusk=compare_means(count ~ group, data=ss, method = "kruskal.test")
+        sumkrusk=as.data.frame(krusk)
+        sumkrusk
+        #多组比较小于0.05，表明多组之间具有差异，可以进行两两非参数检验，并标记字母
+
+        if ( sumkrusk[3]< 0.05) {
+          library(ggpubr)
+          data_box = data_wt[c(1,2,i)]
+          colnames(data_box) = c("ID" , "group","dd" )
+
+          krusk=compare_means(count ~ group, data=ss, method = "wilcox.test")
+          xx=as.data.frame(krusk)
+          xx$group1
+          wilcox_levels = paste(xx$group1,xx$group2,sep = "-")
+          wilcox_levels = xx$p
+
+
+          names(wilcox_levels) =  paste(xx$group1,xx$group2,sep = "-")
+          library("multcompView")
+          wilcox.labels <- data.frame(multcompLetters(wilcox_levels, threshold = 0.05)['Letters'])
+          colnames(wilcox.labels) = "groups"
+          aa = wilcox.labels
+          aa = as.data.frame(aa)
+          aa$group = row.names(aa)
+          stat = aa
+
+          data_box = data_wt[c(1,2,i)]
+          colnames(data_box) = c("ID" , "group","dd" )
+
+
+          data_box$stat=stat[as.character(data_box$group),]$groups
+          max=max(data_box[,c("dd")])
+          min=min(data_box[,c("dd")])
+          x = data_box[,c("group","dd")]
+          library(tidyverse)
+          y = x %>% group_by(group) %>% summarise_(Max=paste('max(',"dd",')',sep=""))
+          y=as.data.frame(y)
+          y
+          rownames(y)=y$group
+          data_box$y=y[as.character(data_box$group),]$Max + (max-min)*0.05
+
+          p = ggplot(data_box, aes(x=group, y=data_box[["dd"]], color=group)) +
+            geom_boxplot(alpha=1, outlier.size=0, size=0.7, width=0.5, fill="transparent") +
+            labs(x=paste(name_i," group", sep = "_"),
+                 y="group",
+                 title = paste("Normality test",p1,"Homogeneity of variance",p2,sep = ":"))+
+            geom_jitter( position=position_jitter(0.17), size=1, alpha=0.7)+theme(legend.position="none")+
+            geom_hline(aes(yintercept=mean(data_box$dd)), colour="black", linetype=2) +
+            geom_vline(aes(xintercept=0), colour="black", linetype="dashed")
+          p
+          # sig_show = "abc"
+          if (sig_show == "abc") {
+            p = p +
+              geom_text(data=data_box, aes(x=group, y=y, color=group, label= stat))
+
+            p
+          }
+
+          FileName <- paste(plotname ,name_i,"_kruskal.test_wlc_box_", ".csv", sep = "_")
+          write.csv(data_box,FileName,quote = F)
+          wtq = levels(data_wt$group)
+          lis = combn(levels(data_wt$group), 2)
+          x <-lis
+          my_comparisons <- tapply(x,rep(1:ncol(x),each=nrow(x)),function(i)i)
+
+          if (sig_show == "line") {
+            p = p +
+              stat_compare_means()+
+              stat_compare_means(comparisons=my_comparisons,label = "p.signif",hide.ns = F) # Add pairwise
+
+            p
+          }
+
+
+          p
+          p=p+Mytheme
+          p
+          if (length(unique(data_wt$group))>3){	p=p+theme(axis.text.x=element_text(angle=45,vjust=1, hjust=1))}
+          FileName <- paste(plotname ,name_i,"_kruskal.test_wlc_box_", ".pdf", sep = "")
+          ggsave(FileName, p, width = 8, height = 8)
+        }else if ( sumkrusk[3] >= 0.05)  {
+          data_box = data_wt[c(1,2,i)]
+          colnames(data_box) = c("ID" , "group","dd" )
+
+          max=max(data_box[,c("dd")])
+          min=min(data_box[,c("dd")])
+          x = data_box[,c("group","dd")]
+          y = x %>% group_by(group) %>% summarise_(Max=paste('max(',"dd",')',sep=""))
+          y=as.data.frame(y)
+          rownames(y)=y$group
+          data_box$y=y[as.character(data_box$group),]$Max + (max-min)*0.05
+          data_box
+          FileName <- paste(plotname ,name_i,method_Mc,"_kruskal.test_nosig_box", ".csv", sep = "_")
+          write.csv(data_box,FileName,quote = F)
+          p = ggplot(data_box, aes(x=group, y=data_box[["dd"]], color=group)) +
+            # geom_hline(aes(yintercept=mean(as.vector(as.matrix(data_wt[i])))), colour="black", linetype=2) +
+            # geom_vline(aes(xintercept=0), colour="black", linetype="dashed") +
+            geom_boxplot(alpha=1, outlier.size=0, size=0.7, width=0.5, fill="transparent") +
+            labs(x=paste(name_i,"box", sep = "_"),
+                 y="group",
+                 title = paste("Normality test",p1,"Homogeneity of variance",p2,"kruskal.test",round(wtx3$`Pr(>F)`[1],3),sep = ":"))+
+            geom_jitter( position=position_jitter(0.17), size=1, alpha=0.7)+theme(legend.position="none")+
+            stat_compare_means()
+          p
+          p=p + Mytheme
+          p
+          if (length(unique(data_wt$group))>3){	p=p+theme(axis.text.x=element_text(angle=45,vjust=1, hjust=1))}
+          FileName <- paste(plotname ,name_i,"_kruskal.test_nosig_box", ".pdf", sep = "")
+          ggsave(FileName, p, width = 8, height = 8)
+        }
+
+
+      }
+
+    }
+
+
+
+  }
+}
+
+}
+
+
