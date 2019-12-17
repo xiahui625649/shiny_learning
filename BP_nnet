@@ -1,0 +1,45 @@
+BP_nnet <- function(inputN,hiddenN,outputN,trained_Xdata,trained_Ydata,sample_Xdata){
+  set.seed(1234)
+  require(AMORE)
+  inputN <- inputN;hiddenN <- hiddenN;outputN <- outputN
+  trained_Xdata <- trained_Xdata;trained_Ydata <- trained_Ydata;sample_Xdata <- sample_Xdata
+  net<-newff(n.neurons=c(inputN,hiddenN,outputN),learning.rate.global=1e-4,momentum.global=0.001,
+             
+             error.criterium="LMS", Stao=NA, hidden.layer="tansig", output.layer="purelin",
+             
+             method="ADAPTgdwm")
+  #learning.rate.global :该参数用于设置神经元学习率
+  #momentum.global :设置全局动量指标，部分训练方法将用到
+  #error.criterium : 用于设置训练误差函数所采用的方法:LMS：最小均方误差
+  #hidden.layer : 设置隐藏层神经元采用的激励函数:"tansig" : 传递函数
+  #output.layer : 设置输出层神经元采用的激励函数:"purelin". 线性函数
+  #method : 设置训练方法即权重更新时所采用的方法:ADAPTgdwm : 含有动量的自适应梯度下降法
+  result<-train(net,trained_Xdata,trained_Ydata,error.criterium="LMS", report=TRUE,
+                show.step=1000000, n.shows=5)
+  #error.criterium 用于测量拟合优度的标准：“LMS”，“LMLS”，“TAO”
+  #report 表示训练功能应保持安静还是应在训练过程中提供图形/书面信息的逻辑值
+  #show.step 在训练结束前，训练最大次数
+  #n.shows报告次数（如果报告为TRUE）。训练时期的总数是n.shows乘以show.step
+  y<-as.data.frame(sim(result$net,sample_Xdata)); names(y) <- "predicted.Y"
+  return(y)
+}
+##an example
+#library(AMORE)
+#p<-matrix(c(-0.12,-0.24,0.53,0.59,-0.63,-0.02,-0.11,0.29,0.42,0.51,-0.45,
+#            
+#            0.36,0.31,-0.67,-0.76,0.00,0.92,-0.32,0.17,-0.55,0.50,-0.49,0.01,0.40,0.78,
+#            
+#            0.92,0.09,-0.72,-0.70,-0.48,0.68,-0.49,0.63,-0.51,0.86,-0.30,-0.61,-0.50,0.23,-0.05),20,2,byrow=T)
+#t<-c(0.13,1.26,0.42,0.03,0.86,0.01,0.13,0.59,0.36,0.15,0.00,0.17,2.89,
+#     
+#     0.39,1.41,0.04,0.01)
+#inputN <- 2
+#hiddenN <- 5
+#outputN <- 1
+#trained_Xdata <- p[1:17,]
+#trained_Ydata <- t[1:17]
+#sample_Xdata <- p[1:20,]
+#a <- BP_nnet(inputN,hiddenN,outputN,trained_Xdata,trained_Ydata,sample_Xdata)
+#cbind(p,a)
+#plot(t,a[1:17,])
+#cor(t,a[1:17,])
