@@ -1,10 +1,10 @@
 #test data
-dat <- data.frame(clone=rep(c("#1","x3"),each=3),
+#dat <- data.frame(clone=rep(c("#1","x3"),each=3),
                   time=rep(1:3,2),
                   qpcr=runif(6,1,100),qpcr_sd=runif(6,1,5),
                   rna=runif(6,1,10),rna_sd=runif(6,0,1))
 #example
-Z(data = dat,group = "clone",factor = "time",
+#Z(data = dat,group = "clone",factor = "time",
   leftY = "qpcr",leftY_sd = "qpcr_sd",
   rightY = "rna",rightY_sd = "rna_sd")
 #function
